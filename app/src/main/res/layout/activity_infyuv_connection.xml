@@ -78,9 +78,9 @@
                     android:id="@+id/refrigerator"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_gravity="center"
                     android:layout_margin="25dp"
                     android:layout_weight="0.50"
-                    android:layout_gravity="center"
                     android:background="@drawable/button_bacground"
 
                     android:gravity="center"
@@ -92,9 +92,9 @@
                     android:id="@+id/lavatory"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_gravity="center"
                     android:layout_margin="25dp"
                     android:layout_weight="0.50"
-                    android:layout_gravity="center"
                     android:background="@drawable/button_bacground"
                     android:gravity="center"
                     android:tag="ON">
@@ -147,10 +147,10 @@
                     android:id="@+id/general_item"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
+                    android:layout_gravity="center"
                     android:layout_margin="25dp"
                     android:layout_weight="0.50"
                     android:background="@drawable/button_bacground"
-                    android:layout_gravity="center"
                     android:gravity="center"
                     android:tag="ON">
 
@@ -228,11 +228,11 @@
                 </Button>
 
                 <TextView
-                    android:layout_marginTop="10dp"
                     android:id="@+id/countDown"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
+                    android:layout_marginTop="10dp"
                     android:text="00:00 min"
                     android:textColor="#000000"
                     android:textSize="20sp">
@@ -245,10 +245,10 @@
                     android:layout_height="30dp"
                     android:layout_gravity="center"
                     android:layout_marginTop="20dp"
+                    android:layout_marginBottom="20dp"
                     android:background="@drawable/button_outline"
                     android:gravity="center"
                     android:text="Turn off"
-                    android:layout_marginBottom="20dp"
                     android:textColor="@color/white"
                     android:textSize="16sp">
 

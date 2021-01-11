@@ -49,10 +49,9 @@ public class AlarmReceiver extends BroadcastReceiver {
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public void show_Notification(Context context) {
-
         NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, default_notification_channel_id);
-        mBuilder.setContentTitle("My Notification");
+        mBuilder.setContentTitle("Time complete.");
         mBuilder.setContentText("InfyUV ");
         mBuilder.setTicker("Notification Listener Service Example");
         Log.e("notification", "Notification Listener Service Example");
@@ -72,6 +71,5 @@ public class AlarmReceiver extends BroadcastReceiver {
         }
         assert mNotificationManager != null;
         mNotificationManager.notify((int) System.currentTimeMillis(), mBuilder.build());
-
     }
 }

@@ -53,21 +53,18 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
     private ListView listViewOFpairdevice, timerList;
     BluetoothSocket socket;
     Context context;
-    public static final String NOTIFICATION_CHANNEL_ID = "10001";
-    private final static String default_notification_channel_id = "default";
     Button refrigerator, lavatory, general_item, open_area, alarm_button;
     private BluetoothDevice device;
     private ArrayAdapter arrayAdapterForList;
     ArrayAdapter<String> spinnerAdapter;
     Set<BluetoothDevice> bondedDevices;
     ArrayList list;
-    byte buffer[];
     int i;
     AlarmManager alarmManager;
     PendingIntent pendingIntent;
     private long mTimeLeftInMili;
     private boolean mTimerRunning;
-    int counter;
+    boolean click = false;
     boolean isDeviceConnected;
     SharedPreferences sharedPreferences;
     CountDownTimer countDownTimer;
@@ -102,8 +99,6 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
         alarmTime = new ArrayList();
         String currentDateandTime = new SimpleDateFormat("HH:mm:ss").format(new Date());
         Log.e("current time ", currentDateandTime);
-//        int i = Integer.parseInt(currentDateandTime);
-//        Log.e("time",i+"");
         connectionBean = new ConnectionBean();
         BluetoothManager manager = (BluetoothManager) getSystemService(BLUETOOTH_SERVICE);
         List<BluetoothDevice> connected = manager.getConnectedDevices(GATT);
@@ -114,6 +109,7 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
         filter.addAction(BluetoothDevice.ACTION_ACL_CONNECTED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED);
         filter.addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        filter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
         BA.startDiscovery();
         this.registerReceiver(mReceiver, filter);
     }
@@ -123,9 +119,31 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
         public void onReceive(Context context, Intent intent) {
             Log.e("data ", "in broadcast");
             String action = intent.getAction();
-//            BluetoothDevice mdevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-//            Log.e("device", mdevice + "");
-
+            if (action.equals(BluetoothAdapter.ACTION_STATE_CHANGED)) {
+                if (BA.getState() == BluetoothAdapter.STATE_TURNING_OFF) {
+                    // The user bluetooth is turning off yet, but it is not disabled yet.
+                    Log.e("off1", "off1");
+                    onBluetooth();
+                    bluetoothConnection.setText("CONNECTION");
+                    bluetoothConnection.setEnabled(true);
+                    if (mTimerRunning == true) {
+                        countDownTimer.cancel();
+                        alarmManager.cancel(pendingIntent);
+                    }
+                    countDown.setText("00:00 mins");
+                    alarm_button.setText("START TIMER");
+                    refrigerator.setTag("ON");
+                    refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                    lavatory.setTag("ON");
+                    lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                    open_area.setTag("ON");
+                    open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                    general_item.setTag("ON");
+                    general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                    deviceOFF.setEnabled(false);
+                    return;
+                }
+            }
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
                 BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 Log.e("device in found", device.getName() + "");
@@ -141,7 +159,6 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
             } else if (BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED.equals(action)) {
                 //Device is about to disconnect
             } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
-                Toast.makeText(getApplicationContext(), "Device Disconnected", Toast.LENGTH_LONG).show();
                 bluetoothConnection.setText("CONNECTION");
                 bluetoothConnection.setEnabled(true);
                 if (mTimerRunning == true) {
@@ -162,7 +179,7 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
                 if (socket.isConnected()) {
                     try {
                         socket.close();
-                        isDeviceConnected=false;
+                        isDeviceConnected = false;
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -353,7 +370,6 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
 
     public void startTimer(long time) {
         countDownTimer = new CountDownTimer(time, 1000) {
-
             @Override
             public void onTick(long l) {
                 mTimeLeftInMili = l;
@@ -391,7 +407,6 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
     }
 
     public boolean BTinit() {
-        boolean found = false;
         BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if (bluetoothAdapter == null) {
             Toast.makeText(getApplicationContext(), "Device doesnt Support Bluetooth", Toast.LENGTH_SHORT).show();
@@ -409,7 +424,6 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
         }
         bondedDevices = bluetoothAdapter.getBondedDevices();
         list = new ArrayList();
-
         if (bondedDevices.isEmpty()) {
             Toast.makeText(getApplicationContext(), "Please Pair the Device first", Toast.LENGTH_SHORT).show();
         } else {
@@ -484,6 +498,7 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
             }
         });
     }
+
     //    private void alertDialog() {
 //        handler.post(new Runnable() {
 //            @Override
@@ -523,28 +538,36 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
 //            }
 //        });
 //    }
+
     public boolean BTconnect() {
         // making the connection of device to your mobile
-        if (device != null) {
-            boolean connected = false;
-            try {
-                Log.e("device name e", device + "");
-                connectionBean.setDevice(device);
-                socket = device.createInsecureRfcommSocketToServiceRecord(PORT_UUID);
-                if (!socket.isConnected()) {
-                    socket.connect();
-                    isDeviceConnected = true;
-//                    connectionBean.setSocket(socket);
-                    Log.e("device name", socket.isConnected() + "");
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (device != null) {
+                        boolean connected = false;
+                        try {
+                            Log.e("device name e", device + "");
+                            connectionBean.setDevice(device);
+                            socket = device.createInsecureRfcommSocketToServiceRecord(PORT_UUID);
+                            if (!socket.isConnected()) {
+                                click = true;
+                                socket.connect();
+                                isDeviceConnected = true;
+                                Log.e("device name", socket.isConnected() + "");
+                            }
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            Log.e("error", e.getMessage() + "");
+                            connected = true;
+                        }
+                    }
+                } catch (Exception e) {
+                    Log.e("excep", e.getMessage());
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
-                Log.e("error", e.getMessage() + "");
-
-                connected = true;
             }
-            return connected;
-        }
+        });
         return false;
     }
 
@@ -703,94 +726,98 @@ public class InfyuvConnection extends AppCompatActivity implements View.OnClickL
     public void turnOnDevice(String string) {
         String offString = "0";
         mTimeLeftInMili = 60000;
-        if (socket != null) {
-            Log.e("isconnected", socket.isConnected() + "");
-            if (socket.isConnected()) {
-                connectionBean.setSocket(socket);
-                connectionBean.setSwitch(true);
-                try {
-                    outputStream = socket.getOutputStream();
-                    Log.e("device  after connected", "" + socket);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                try {
-                    inputStream = socket.getInputStream();
-                    Log.e("output", inputStream + "");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                try {
-                    if (mTimerRunning == true) {
-                        countDownTimer.cancel();
-                        alarmManager.cancel(pendingIntent);
+        try {
+            if (socket != null && socket.isConnected() == true) {
+                Log.e("isconnected", socket.isConnected() + "");
+                if (socket.isConnected()) {
+                    connectionBean.setSocket(socket);
+                    connectionBean.setSwitch(true);
+                    try {
+                        outputStream = socket.getOutputStream();
+                        Log.e("device  after connected", "" + socket);
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
-                    Log.e("string", string);
-                    deviceOFF.setEnabled(true);
-                    if (string.equals("r")) {
+                    try {
+                        inputStream = socket.getInputStream();
+                        Log.e("output", inputStream + "");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    try {
+                        if (mTimerRunning == true) {
+                            countDownTimer.cancel();
+                            alarmManager.cancel(pendingIntent);
+                        }
+                        Log.e("string", string);
+                        deviceOFF.setEnabled(true);
+                        if (string.equals("r")) {
+                            Log.e("string ", string);
+                            refrigerator.setTag("OFF");
+                            refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
+                            lavatory.setTag("ON");
+                            lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            open_area.setTag("ON");
+                            open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            general_item.setTag("ON");
+                            general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            setAlarm(10);
+                            mTimeLeftInMili = mTimeLeftInMili * 10;
+                            startTimer(mTimeLeftInMili);
+                        } else if (string.equals("l")) {
+                            lavatory.setTag("OFF");
+                            lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
+                            open_area.setTag("ON");
+                            open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            general_item.setTag("ON");
+                            general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            refrigerator.setTag("ON");
+                            refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            setAlarm(15);
+                            mTimeLeftInMili = mTimeLeftInMili * 15;
+                            startTimer(mTimeLeftInMili);
+                        } else if (string.equals("o")) {
+                            open_area.setTag("OFF");
+                            open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
+                            general_item.setTag("ON");
+                            general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            refrigerator.setTag("ON");
+                            refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            lavatory.setTag("ON");
+                            lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            setAlarm(5);
+                            mTimeLeftInMili = mTimeLeftInMili * 5;
+                            startTimer(mTimeLeftInMili);
+                        } else if (string.equals("g")) {
+                            general_item.setTag("OFF");
+                            general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
+                            refrigerator.setTag("ON");
+                            refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            lavatory.setTag("ON");
+                            lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            open_area.setTag("ON");
+                            open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
+                            setAlarm(2);
+                            mTimeLeftInMili = mTimeLeftInMili * 2;
+                            startTimer(mTimeLeftInMili);
+                        }
+                        countDown.setText("00:00 mins");
+                        alarm_button.setText("Start Timer");
+                        outputStream.write(offString.getBytes());
+                        outputStream.write(string.getBytes());
+                        bluetoothConnection.setEnabled(false);
+                    } catch (IOException e) {
                         Log.e("string ", string);
-                        refrigerator.setTag("OFF");
-                        refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
-                        lavatory.setTag("ON");
-                        lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        open_area.setTag("ON");
-                        open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        general_item.setTag("ON");
-                        general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        setAlarm(10);
-                        mTimeLeftInMili = mTimeLeftInMili * 10;
-                        startTimer(mTimeLeftInMili);
-                    } else if (string.equals("l")) {
-                        lavatory.setTag("OFF");
-                        lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
-                        open_area.setTag("ON");
-                        open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        general_item.setTag("ON");
-                        general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        refrigerator.setTag("ON");
-                        refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        setAlarm(15);
-                        mTimeLeftInMili = mTimeLeftInMili * 15;
-                        startTimer(mTimeLeftInMili);
-                    } else if (string.equals("o")) {
-                        open_area.setTag("OFF");
-                        open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
-                        general_item.setTag("ON");
-                        general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        refrigerator.setTag("ON");
-                        refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        lavatory.setTag("ON");
-                        lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        setAlarm(5);
-                        mTimeLeftInMili = mTimeLeftInMili * 5;
-                        startTimer(mTimeLeftInMili);
-                    } else if (string.equals("g")) {
-                        general_item.setTag("OFF");
-                        general_item.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_off));
-                        refrigerator.setTag("ON");
-                        refrigerator.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        lavatory.setTag("ON");
-                        lavatory.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        open_area.setTag("ON");
-                        open_area.setBackgroundDrawable(getResources().getDrawable(R.drawable.button_bacground));
-                        setAlarm(2);
-                        mTimeLeftInMili = mTimeLeftInMili * 2;
-                        startTimer(mTimeLeftInMili);
                     }
-                    countDown.setText("00:00 mins");
-                    alarm_button.setText("Start Timer");
-                    outputStream.write(offString.getBytes());
-                    outputStream.write(string.getBytes());
-                    bluetoothConnection.setEnabled(false);
-                } catch (IOException e) {
-                    Log.e("string ", string);
-                }
 
+                } else {
+                    Toast.makeText(getApplicationContext(), "Please Connect To InfyUV ", Toast.LENGTH_SHORT).show();
+                }
             } else {
                 Toast.makeText(getApplicationContext(), "Please Connect To InfyUV ", Toast.LENGTH_SHORT).show();
             }
-        } else {
-            Toast.makeText(getApplicationContext(), "Please Connect To InfyUV ", Toast.LENGTH_SHORT).show();
+        } catch (Exception ex) {
+            Log.e("crash Exception", ex.getMessage());
         }
     }
 
